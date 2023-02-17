@@ -9,6 +9,11 @@ from hashes import Hashes
 from config import Config
 from manifest import Manifest
 
+# Make sure the python version satisfies the requirement.
+if sys.version_info < (3, 9, 1):
+    Log.error("Python needs to be at least version 3.9.1")
+    sys.exit(1)
+
 
 def pull_updates(manifest: Manifest, hashes: Hashes) -> int:
     """Pulls updates from the remote server."""
@@ -67,15 +72,17 @@ def confirm_location(local_root: str) -> bool:
     valid_input: bool = False
     if not path.is_dir():
         while not valid_input:
-            res = input(f"Directory does not exist:\n{local_root}\n\n"
-                        "Do you wish to continue ([Y]es / [N]o)? ")
+            print("|:=---------------------=:|")
+            res = input(f" Directory does not exist:\n {local_root}\n\n"
+                        " Do you wish to continue ([Y]es / [N]o)? ")
             if res.lower() in ("y", "yes", "n", "no"):
                 valid_input = True
                 if res.lower() in ("y", "yes"):
                     return True
     while not valid_input:
-        res = input(f"Directory exists, downloading to:\n{local_root}\n\n"
-                    "Do you wish to continue ([Y]es / [N]o)? ")
+        print("|:=-----------------------------=:|")
+        res = input(f" Directory exists, downloading to:\n {local_root}\n\n"
+                    " Do you wish to continue ([Y]es / [N]o)? ")
         if res.lower() in ("y", "yes", "n", "no"):
             valid_input = True
             if res.lower() in ("y", "yes"):
@@ -103,9 +110,10 @@ def main():
     Log.debug_mode = config.debug
 
     # Ask the user for permission.
-    if not config.skip_prompt and not confirm_location(config.local_root):
-        sys.exit(0)
-    print("\n")
+    if not config.skip_prompt:
+        if not confirm_location(config.local_root):
+            sys.exit(0)
+        print("")
     Log.info("Checking for updates.")
 
     uri = f"{config.remote_root}:{config.remote_port}"
@@ -159,4 +167,4 @@ if __name__ == "__main__":
         Log.warn("Interrupt detected, exiting.")
         sys.exit(1)
     except BaseException as exc:
-        Log.error(str(exc))
+        Log.error(f"Critical Error: {exc}")

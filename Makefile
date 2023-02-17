@@ -1,20 +1,18 @@
 install:
-	python3 -m venv venv
-	. ./venv/bin/activate
 	pip install -r requirements.txt
 
 fix:
-	autopep8 --recursive --aggressive --in-place uo_manifest_patcher
+	autopep8 --recursive --aggressive --in-place uopatcher
 
 set-env:
-	. ./venv/bin/activate
+	[[ -f ./venv/bin/activate ]] && . ./venv/bin/activate
 
 start: set-env
-	python3 uo_manifest_patcher/core.py
+	python3 uopatcher/core.py
 
 test: set-env
 		watchmedo auto-restart \
 		--patterns="*.py" \
-		--directory="uo_manifest_patcher/"\
+		--directory="uopatcher/"\
 		--recursive \
-		python3 uo_manifest_patcher/core.py
+		python3 uopatcher/core.py

@@ -26,7 +26,7 @@ class Log:
 
     @staticmethod
     def warn(msg: str, end: str = '\n') -> None:
-        """Creates a warn log."""
+        """Creates a warning log."""
         return Log.do(msg, end=end, logtype=LogType.WARN)
 
     @staticmethod

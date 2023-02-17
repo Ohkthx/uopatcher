@@ -2,7 +2,7 @@ import sys
 import codecs
 import pathlib
 import hashlib
-import requests
+import urllib.request
 from enum import Enum
 from typing import Optional
 from datetime import datetime
@@ -19,11 +19,11 @@ def download_file(remote_resource: str,
     start: datetime = datetime.now()
 
     # Get the stream we will be pulling from.
-    stream = requests.get(remote_resource, stream=True)
+    request = urllib.request.urlopen(remote_resource)
 
     # Calculate size of the downloaded content.
     size: int = 0
-    content_length = stream.headers.get("content-length", None)
+    content_length = request.getheader("content-length", None)
     if content_length:
         try:
             size = int(content_length)
@@ -34,8 +34,14 @@ def download_file(remote_resource: str,
     pathlib.Path(local_resource).parent.mkdir(parents=True, exist_ok=True)
 
     # Open the local file, download the remote, saving locally.
+    has_data: bool = True
     with open(local_resource, 'wb') as f:
-        for chunk in stream.iter_content(chunk_size=chunk_size):
+        while has_data:
+            chunk = request.read(chunk_size)
+            if not chunk or len(chunk) == 0:
+                has_data = False
+                continue
+
             # Remove the BOM character at the start of the file.
             if chunk.startswith(codecs.BOM_UTF8):
                 chunk = chunk[len(codecs.BOM_UTF8):]

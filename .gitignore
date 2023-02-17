@@ -131,6 +131,7 @@ dmypy.json
 
 # Configurations / settings
 *.ini
+.idea/
 
 # Temporary Directories and Files
 temp/
