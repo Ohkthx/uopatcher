@@ -1,92 +1,90 @@
-from typing import Optional
-import requests
-import configparser
+import os
+import sys
 import pathlib
+from datetime import datetime
+
+from uofile import FileAction
+from hashes import Hashes
+from settings import Settings
+from manifest import Manifest
 
 
-class Settings():
-    """User defined settings that are saved locally."""
-    CONFIG_FILENAME: str = "config.ini"
+def pull_updates(manifest: Manifest, hashes: Hashes) -> int:
+    """Pulls updates from the remote server."""
+    total_size: int = 0
+    for file_id, uofile in manifest.FILES.items():
+        print(f"[--] Checking: '{uofile.path}'", end='\r')
 
-    def __init__(self, config: configparser.ConfigParser) -> None:
-        self.config = config
+        # Check if the local version exists.
+        action: FileAction = FileAction.NONE
+        local_hash = hashes.local_hashes.get(file_id, None)
+        if not local_hash and uofile.action != FileAction.DELETE:
+            # Files needs to be downloaded.
+            action = FileAction.CREATE
 
-    @property
-    def debug(self) -> bool:
-        """Used to print out more verbose information while running."""
-        return self.config.getboolean('DEFAULT', 'DEBUG', fallback=False)
+        if not uofile.remote_hashes:
+            # File does not exist in the remote, delete it locally.
+            action = FileAction.DELETE
+        elif local_hash and local_hash not in uofile.remote_hashes:
+            # Mismatched hashes, get the remote version.
+            action = FileAction.CREATE
 
-    @property
-    def hostname(self) -> str:
-        """Hostname/URI for the remote source of the updates."""
-        return self.config.get('DEFAULT', 'HOST', fallback='unset')
+        # Perform the non-create actions.
+        if action == FileAction.NONE:
+            print(f"[++] Skipping: '{file_id}'", end='\r')
+            continue
+        elif action == FileAction.DELETE:
+            print(f"[++] Removing: '{file_id}'")
+            if uofile.local_exists:
+                try:
+                    os.remove(uofile.local_resource)
+                except FileNotFoundError:
+                    print(f"[!!] File cannot be deleted: '{file_id}'")
+                del hashes.local_hashes[file_id]
+                del hashes.sizes[file_id]
+                continue
 
-    @property
-    def port(self) -> int:
-        """Port number for the remote source of the updates."""
-        return self.config.getint('DEFAULT', 'PORT', fallback=8080)
-
-    @property
-    def target_dir(self) -> str:
-        """Local directory for files to be saved to."""
-        return self.config.get('DEFAULT', 'TARGET_DIR', fallback="temp/")
-
-    @staticmethod
-    def exists() -> bool:
-        """Checks if the configuration file already exists."""
-        return pathlib.Path(Settings.CONFIG_FILENAME).is_file()
-
-    @staticmethod
-    def load() -> Optional['Settings']:
-        """Loads the configuration file from a local file."""
-        # Cannot load a non-existing file.
-        if not Settings.exists():
-            return None
-
-        # Load the file, initialize Settings.
-        config = configparser.ConfigParser()
-        config.read(Settings.CONFIG_FILENAME)
-        return Settings(config)
-
-    @staticmethod
-    def create() -> bool:
-        """Creates a new configuration file if it does not exist."""
-        # If the file exists, ignore.
-        if Settings.exists():
-            return False
-
-        # Create the default values that must be changed.
-        config = configparser.ConfigParser()
-        config['DEFAULT'] = {}
-        config['DEFAULT']['DEBUG'] = "False"
-        config['DEFAULT']['HOST'] = "patch.example.com"
-        config['DEFAULT']['PORT'] = "8080"
-        config['DEFAULT']['TARGET_DIR'] = "temp/"
-
-        # Save it locally.
-        with open(Settings.CONFIG_FILENAME, 'w', encoding='utf-8') as f:
-            config.write(f)
-        return True
+        print(f"[--] Downloading: '{file_id}'", end='\r')
+        stats = uofile.download()
+        if not stats:
+            print(f"[!!] Failed Download: '{file_id}'")
+        else:
+            # Add to the download size.
+            mbps = (stats[0] / 1024 / 1024) / stats[1]
+            print(f"[++] File Obtained: '{file_id}', {mbps:0.2f} mbps")
+            size = hashes.sizes.get(file_id, None)
+            if size and size > 0:
+                total_size = total_size + size
+    return total_size
 
 
-def download_file(uri: str, filename: str,
-                  target_dir: str,
-                  chunk_size: int = 1024):
-    """Downloads a file from a remote host into a local repository."""
-    # Get the stream we will be pulling from.
-    stream = requests.get(f"{uri}/{filename}", stream=True)
-
-    # Open the local file, download the remote, saving locally.
-    with open(pathlib.Path(target_dir, filename), 'wb') as f:
-        for chunk in stream.iter_content(chunk_size=chunk_size):
-            if chunk:
-                f.write(chunk)
+def confirm_location(local_root: str) -> bool:
+    """Asks the user to verify the patch location."""
+    path = pathlib.Path(local_root)
+    valid_input: bool = False
+    if not path.is_dir():
+        while not valid_input:
+            res = input(f"Directory does not exist:\n{local_root}\n\n"
+                        "Do you wish to continue ([Y]es / [N]o)? ")
+            if res.lower() in ("y", "yes", "n", "no"):
+                valid_input = True
+                if res.lower() in ("y", "yes"):
+                    return True
+    while not valid_input:
+        res = input(f"Directory exists, downloading to:\n{local_root}\n\n"
+                    "Do you wish to continue ([Y]es / [N]o)? ")
+        if res.lower() in ("y", "yes", "n", "no"):
+            valid_input = True
+            if res.lower() in ("y", "yes"):
+                return True
+    return False
 
 
 def main():
-    """Entrancce into the application."""
+    """Entrance into the application."""
     # Try to load the configuration, if it fails it will be created.
     try:
+        print(f"\nLoading configuration file: '{Settings.CONFIG_FILENAME}'\n")
         config = Settings.load()
     except BaseException as err:
         print(f"Error while loading configuration file:\n{str(err)}")
@@ -99,21 +97,53 @@ def main():
             print(f"Default config: '{Settings.CONFIG_FILENAME}' created.")
         return
 
+    # Ask the user for permission.
+    if not confirm_location(config.target_dir):
+        sys.exit(0)
+    print("\n\nChecking for updates.")
+
     uri = f"{config.hostname}:{config.port}"
-    manifest: str = "Manifest"
 
-    # Ensures the destination to be saved exists.
-    print("Creating space for downloads.")
-    pathlib.Path(config.target_dir).mkdir(
-        parents=True, exist_ok=True)
+    # Load the local manifest, if it does not exist, get it.
+    manifest = Manifest(uri, config.target_dir)
+    loaded = manifest.load()
+    if not loaded:
+        print("[!!] Local Manifest missing, downloading new one.")
+        if not manifest.update():
+            raise ConnectionError("Could not download remote Manifest.")
 
-    # Pull the Manifest file as a test.
-    print(f"Getting Manifest from '{uri}/{manifest}'")
-    try:
-        download_file(uri, manifest, config.target_dir)
-    except BaseException as exc:
-        print(f"[!!] Exception: {exc}")
+    # Was able to load a local manifest, check for updates.
+    if loaded:
+        version = manifest.version
+        if not manifest.update():
+            raise ConnectionError("Could not download remote Manifest.")
+
+        # Check if the local is newer or the same.
+        if version >= manifest.version:
+            print("Already have the most up-to-date Manifest.")
+
+    print(f"Manifest Version: '{manifest.version}'\n")
+
+    hashes = Hashes(uri, config.target_dir)
+    print(f"Updating '{hashes.name}' file.")
+    hashes.update()
+    print("Generating local hashes.\n")
+    hashes.build_localhash()
+
+    timestamp: datetime = datetime.now()
+    size = pull_updates(manifest, hashes)
+    timelength = datetime.now() - timestamp
+
+    size_mb = size / 1024 / 1024
+    time_sec = timelength.total_seconds()
+    print(f"\nDownload rate: {(size_mb / time_sec):0.2f} mbps")
+    print(f"Total time: {(time_sec/60):0.2f} min")
+    print(f"Total size: {(size_mb / 1024):0.2f} gb ({size_mb:0.2f} mb)")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Interrupt detected, exiting.")
+        sys.exit(1)
