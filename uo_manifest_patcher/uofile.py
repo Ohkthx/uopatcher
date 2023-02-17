@@ -7,6 +7,8 @@ from enum import Enum
 from typing import Optional
 from datetime import datetime
 
+from log import Log
+
 
 def download_file(remote_resource: str,
                   local_resource: str,
@@ -121,8 +123,8 @@ class UOFile:
         try:
             return download_file(self.remote_resource, self.local_resource)
         except KeyboardInterrupt:
-            print("Interrupt detected, exiting.")
+            Log.warn("Interrupt detected, exiting.")
             sys.exit(1)
         except BaseException as exc:
-            print(f"EXCEPTION: {exc}")
+            Log.error(f"Could not download {self.name}: {exc}")
         return None

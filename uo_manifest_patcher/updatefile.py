@@ -1,3 +1,4 @@
+from log import Log
 from uofile import UOFile
 
 
@@ -39,7 +40,7 @@ class UpdateFile(UOFile):
 
         with open(self.local_resource, 'r', encoding='utf-8') as f:
             for n, line in enumerate(f):
-                self._process(line.strip(), n+1)
+                self._process(line.strip(), n + 1)
 
         # Trigger the post-processor if it has been set.
         try:
@@ -54,7 +55,7 @@ class UpdateFile(UOFile):
             if self.download():
                 return self.load()
         except BaseException as exc:
-            print(f"[!!] Exception: {exc}")
+            Log.error(f"Could not update {self.name}: {exc}")
         return False
 
     def _process(self, line_data: str, line_number: int):

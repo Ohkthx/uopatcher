@@ -1,5 +1,7 @@
-init:
-	pip3 install -r requirements.txt
+install:
+	python3 -m venv venv
+	. ./venv/bin/activate
+	pip install -r requirements.txt
 
 fix:
 	autopep8 --recursive --aggressive --in-place uo_manifest_patcher

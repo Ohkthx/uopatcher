@@ -3,9 +3,10 @@ import sys
 import pathlib
 from datetime import datetime
 
+from log import Log
 from uofile import FileAction
 from hashes import Hashes
-from settings import Settings
+from config import Config
 from manifest import Manifest
 
 
@@ -13,7 +14,7 @@ def pull_updates(manifest: Manifest, hashes: Hashes) -> int:
     """Pulls updates from the remote server."""
     total_size: int = 0
     for file_id, uofile in manifest.FILES.items():
-        print(f"[--] Checking: '{uofile.path}'", end='\r')
+        Log.info(f"Checking: '{uofile.name}'", end='\r')
 
         # Check if the local version exists.
         action: FileAction = FileAction.NONE
@@ -31,30 +32,32 @@ def pull_updates(manifest: Manifest, hashes: Hashes) -> int:
 
         # Perform the non-create actions.
         if action == FileAction.NONE:
-            print(f"[++] Skipping: '{file_id}'", end='\r')
+            Log.info(f"Skipped: '{uofile.name}'", end='\r')
             continue
         elif action == FileAction.DELETE:
-            print(f"[++] Removing: '{file_id}'")
+            Log.info(f"Removing: '{uofile.name}'", end='\r')
             if uofile.local_exists:
                 try:
                     os.remove(uofile.local_resource)
+                    Log.info(f"Removed: '{uofile.name}'", end='\r')
                 except FileNotFoundError:
-                    print(f"[!!] File cannot be deleted: '{file_id}'")
+                    Log.error(f"File cannot be deleted: '{file_id}'")
                 del hashes.local_hashes[file_id]
                 del hashes.sizes[file_id]
                 continue
 
-        print(f"[--] Downloading: '{file_id}'", end='\r')
+        Log.info(f"Downloading: '{uofile.name}'", end='\r')
         stats = uofile.download()
         if not stats:
-            print(f"[!!] Failed Download: '{file_id}'")
+            Log.error(f"Failed: '{uofile.name}'")
         else:
             # Add to the download size.
             mbps = (stats[0] / 1024 / 1024) / stats[1]
-            print(f"[++] File Obtained: '{file_id}', {mbps:0.2f} mbps")
+            Log.info(f"Downloaded: '{uofile.name}', {mbps:0.2f} mbps")
             size = hashes.sizes.get(file_id, None)
             if size and size > 0:
                 total_size = total_size + size
+    Log.clear()
     return total_size
 
 
@@ -84,31 +87,34 @@ def main():
     """Entrance into the application."""
     # Try to load the configuration, if it fails it will be created.
     try:
-        print(f"\nLoading configuration file: '{Settings.CONFIG_FILENAME}'\n")
-        config = Settings.load()
+        Log.info(f"Loading configuration file: '{Config.FILENAME}'\n")
+        config = Config.load()
     except BaseException as err:
-        print(f"Error while loading configuration file:\n{str(err)}")
+        Log.error(f"Error while loading configuration file:\n{str(err)}")
         return
 
     if not config:
-        print(f"Configuration file '{Settings.CONFIG_FILENAME}' "
-              "does not exist.")
-        if Settings.create():
-            print(f"Default config: '{Settings.CONFIG_FILENAME}' created.")
+        Log.warn(f"Configuration file '{Config.FILENAME}' does not exist.")
+        if Config.create():
+            Log.info(f"Default config: '{Config.FILENAME}' created.")
         return
 
-    # Ask the user for permission.
-    if not confirm_location(config.target_dir):
-        sys.exit(0)
-    print("\n\nChecking for updates.")
+    # Set the debug information.
+    Log.debug_mode = config.debug
 
-    uri = f"{config.hostname}:{config.port}"
+    # Ask the user for permission.
+    if not config.skip_prompt and not confirm_location(config.local_root):
+        sys.exit(0)
+    print("\n")
+    Log.info("Checking for updates.")
+
+    uri = f"{config.remote_root}:{config.remote_port}"
 
     # Load the local manifest, if it does not exist, get it.
-    manifest = Manifest(uri, config.target_dir)
+    manifest = Manifest(uri, config.local_root)
     loaded = manifest.load()
     if not loaded:
-        print("[!!] Local Manifest missing, downloading new one.")
+        Log.warn("Local Manifest missing, downloading new one.")
         if not manifest.update():
             raise ConnectionError("Could not download remote Manifest.")
 
@@ -120,30 +126,37 @@ def main():
 
         # Check if the local is newer or the same.
         if version >= manifest.version:
-            print("Already have the most up-to-date Manifest.")
+            Log.info("Already have the most up-to-date Manifest.")
 
-    print(f"Manifest Version: '{manifest.version}'\n")
+    Log.info(f"Manifest Version: '{manifest.version}'\n")
 
-    hashes = Hashes(uri, config.target_dir)
-    print(f"Updating '{hashes.name}' file.")
+    # Build the hashes.
+    hashes = Hashes(uri, config.local_root)
+    Log.info(f"Updating '{hashes.name}' file.")
     hashes.update()
-    print("Generating local hashes.\n")
+    Log.info("Generating local hashes.\n")
     hashes.build_localhash()
 
+    # Start checking for updates.
+    Log.info("Getting updates.")
     timestamp: datetime = datetime.now()
     size = pull_updates(manifest, hashes)
     timelength = datetime.now() - timestamp
 
+    # Print some statistics.
     size_mb = size / 1024 / 1024
     time_sec = timelength.total_seconds()
-    print(f"\nDownload rate: {(size_mb / time_sec):0.2f} mbps")
-    print(f"Total time: {(time_sec/60):0.2f} min")
-    print(f"Total size: {(size_mb / 1024):0.2f} gb ({size_mb:0.2f} mb)")
+    print("\n")
+    Log.info(f"Download rate: {(size_mb / time_sec):0.2f} mbps")
+    Log.info(f"Total time: {(time_sec/60):0.2f} min")
+    Log.info(f"Total size: {(size_mb / 1024):0.2f} gb ({size_mb:0.2f} mb)")
 
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("Interrupt detected, exiting.")
+        Log.warn("Interrupt detected, exiting.")
         sys.exit(1)
+    except BaseException as exc:
+        Log.error(str(exc))
