@@ -1,3 +1,5 @@
+{ "version": [1, 0, 0] }
+
 # Ultima Online Manifest Patcher
 
 This application is used to provide cross-platform support to shards/servers that utilize a **Manifest**-based patching technique. You will need to know the **root url**  and **port** required to access that data. 
