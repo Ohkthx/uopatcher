@@ -63,8 +63,17 @@ class Config:
         """Saves the configuration file, only really used for future
         updates where additional options exist.
         """
+        config = configparser.ConfigParser()
+        config['DEFAULT'] = {}
+        config['DEFAULT']['DEBUG'] = str(self.debug)
+        config['DEFAULT']['SKIP_PROMPT'] = str(self.skip_prompt)
+        config['DEFAULT']['VERBOSE'] = str(self.verbose)
+        config['DEFAULT']['LOCAL_ROOT'] = str(self.local_root)
+        config['DEFAULT']['REMOTE_ROOT'] = str(self.remote_root)
+        config['DEFAULT']['REMOTE_PORT'] = str(self.remote_port)
+
         with open(Config.FILENAME, 'w', encoding='utf-8') as f:
-            self.config.write(f)
+            config.write(f)
 
     @staticmethod
     def create() -> bool:

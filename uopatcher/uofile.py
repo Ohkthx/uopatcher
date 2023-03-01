@@ -1,5 +1,4 @@
 import sys
-import codecs
 import pathlib
 import hashlib
 import urllib.request
@@ -27,7 +26,7 @@ def progress_bar(resource: str, size: int, max_size: int,
 
 def download_file(remote_resource: str,
                   local_resource: str,
-                  chunk_size: int = 1024,
+                  chunk_size: int = 1024 * 1024,
                   show_progress: bool = False,
                   ) -> tuple[int, float]:
     """Downloads a file from a remote host into a local repository.
