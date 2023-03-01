@@ -38,7 +38,7 @@ class UpdateFile(UOFile):
         if not self.local_exists:
             return False
 
-        with open(self.local_resource, 'r', encoding='utf-8') as f:
+        with open(self.local_resource, 'r', encoding='utf-8-sig') as f:
             for n, line in enumerate(f):
                 self._process(line.strip(), n + 1)
 

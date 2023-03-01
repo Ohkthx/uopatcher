@@ -3,6 +3,7 @@ from enum import IntEnum, auto
 
 class LogType(IntEnum):
     """Determines the severity or type of the log."""
+    NOTIFY = auto()
     INFO = auto()
     DEBUG = auto()
     WARN = auto()
@@ -12,7 +13,13 @@ class LogType(IntEnum):
 class Log:
     """Representation of a log used for printing information."""
     debug_mode: bool = False
+    verbose_mode: bool = False
     _last_len: int = 0
+
+    @staticmethod
+    def notify(msg: str, end: str = '\n') -> None:
+        """Creates a normal print log."""
+        return Log.do(msg, end=end, logtype=LogType.NOTIFY)
 
     @staticmethod
     def info(msg: str, end: str = '\n') -> None:
@@ -38,8 +45,10 @@ class Log:
     def do(msg: str, end: str = '\n',
            logtype: LogType = LogType.INFO) -> None:
         """Creates a log input, saving if it ends in a new line."""
-        if logtype == LogType.INFO:
+        if logtype == LogType.NOTIFY:
             Log._print(f"[{logtype.name.lower()}] {msg}", end=end)
+        if logtype == LogType.INFO:
+            Log._info(f"[{logtype.name.lower()}] {msg}", end=end)
         if logtype == LogType.DEBUG:
             Log._debug(f"[{logtype.name.lower()}] {msg}", end=end)
         if logtype == LogType.WARN:
@@ -67,6 +76,13 @@ class Log:
             extra = ' ' * diff
         print(f"{text}{extra}", end=end)
         Log._last_len = len(text)
+
+    @staticmethod
+    def _info(text: str, end: str = '\n') -> None:
+        """Only prints the text passed if verbose mode is currently set."""
+        if not Log.verbose_mode:
+            return
+        Log._print(text, end=end)
 
     @staticmethod
     def _debug(text: str, end: str = '\n') -> None:

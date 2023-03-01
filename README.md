@@ -1,3 +1,5 @@
+{ "version": [1, 0, 1] }
+
 # Ultima Online Manifest Patcher
 
 This application is used to provide cross-platform support to shards/servers that utilize a **Manifest**-based patching technique. You will need to know the **root url**  and **port** required to access that data. 
@@ -19,6 +21,7 @@ Configuration file is located in the root directory, named **config.ini**, and g
 [DEFAULT]
 debug = False
 skip_prompt = False
+verbose = False
 local_root = temp
 remote_root = patch.example.com
 remote_port = 8080
@@ -26,6 +29,7 @@ remote_port = 8080
 
 - **debug** - Shows additional output used for troubleshooting.
 - **skip_prompt** - Skips prompting the user about the installation directory, useful for automation.
+- **verbose** - Shows additional text including progress on downloading a file.
 - **local_root** - Root directory to save the patch files in.
 - **remote_root** - Root URL/URI to obtain the Manifest, Hashes, and additional patch files.
 - **remote_port** - Port used to access the resources. 

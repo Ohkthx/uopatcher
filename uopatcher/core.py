@@ -1,6 +1,10 @@
+#!/usr/bin/env python3
+
 import os
 import sys
+import json
 import pathlib
+import urllib.request
 from datetime import datetime
 
 from log import Log
@@ -15,11 +19,56 @@ if sys.version_info < (3, 9, 1):
     sys.exit(1)
 
 
-def pull_updates(manifest: Manifest, hashes: Hashes) -> int:
+def print_version(version: tuple[int, int, int]):
+    """Translates a version from a tuple to a string."""
+    return '.'.join(map(str, version))
+
+
+def needs_update() -> bool:
+    """Checks to see if a newer patcher version exists on GitHub."""
+    # Check that the local README.md exists
+    local_readme: str = "./README.md"
+    if not pathlib.Path(local_readme).is_file():
+        raise FileNotFoundError("Cannot check for patcher updates, "
+                                "required README.md could not be found.")
+
+    # Parse the version from the local README.md
+    local_version: tuple[int, int, int] = (0, 0, 0)
+    with open(local_readme, 'r', encoding='utf-8') as f:
+        encoded_version = f.readline().strip()
+        try:
+            decoded_version = json.loads(encoded_version)
+            local_version = tuple(decoded_version['version'])
+        except BaseException:
+            raise ValueError("Could not parse patcher's "
+                             "version from README.md.")
+
+    # Attempt to get the version that GitHub is currently on.
+    remote_version: tuple[int, int, int] = (0, 0, 0)
+    remote_readme: str = "https://raw.githubusercontent.com/Ohkthx/uopatcher/main/README.md"
+    with urllib.request.urlopen(remote_readme) as remote:
+        try:
+            # Read the first line and decode the version.
+            encoded_version = remote.readline().decode().strip()
+            decoded_version = json.loads(encoded_version)
+            remote_version = tuple(decoded_version['version'])
+        except BaseException:
+            raise ValueError("Could not parse patcher's "
+                             "remote version from README.md.")
+
+    # Check for version mismatch.
+    Log.notify(f"Local Patcher Version:  {print_version(local_version)}")
+    Log.notify(f"Remote Patcher Version: {print_version(remote_version)}\n")
+    return local_version < remote_version
+
+
+def pull_updates(manifest: Manifest,
+                 hashes: Hashes,
+                 verbose: bool) -> int:
     """Pulls updates from the remote server."""
     total_size: int = 0
     for file_id, uofile in manifest.FILES.items():
-        Log.info(f"Checking: '{uofile.name}'", end='\r')
+        Log.notify(f"Checking: '{uofile.name}'", end='\r')
 
         # Check if the local version exists.
         action: FileAction = FileAction.NONE
@@ -51,8 +100,8 @@ def pull_updates(manifest: Manifest, hashes: Hashes) -> int:
                 del hashes.sizes[file_id]
                 continue
 
-        Log.info(f"Downloading: '{uofile.name}'", end='\r')
-        stats = uofile.download()
+        Log.notify(f"Downloading: '{uofile.name}'", end='\r')
+        stats = uofile.download(show_progress=verbose)
         if not stats:
             Log.error(f"Failed: '{uofile.name}'")
         else:
@@ -72,7 +121,7 @@ def confirm_location(local_root: str) -> bool:
     valid_input: bool = False
     if not path.is_dir():
         while not valid_input:
-            print("|:=---------------------=:|")
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             res = input(f" Directory does not exist:\n {local_root}\n\n"
                         " Do you wish to continue ([Y]es / [N]o)? ")
             if res.lower() in ("y", "yes", "n", "no"):
@@ -80,7 +129,7 @@ def confirm_location(local_root: str) -> bool:
                 if res.lower() in ("y", "yes"):
                     return True
     while not valid_input:
-        print("|:=-----------------------------=:|")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         res = input(f" Directory exists, downloading to:\n {local_root}\n\n"
                     " Do you wish to continue ([Y]es / [N]o)? ")
         if res.lower() in ("y", "yes", "n", "no"):
@@ -94,7 +143,7 @@ def main():
     """Entrance into the application."""
     # Try to load the configuration, if it fails it will be created.
     try:
-        Log.info(f"Loading configuration file: '{Config.FILENAME}'\n")
+        Log.notify(f"Loading configuration file: '{Config.FILENAME}'\n")
         config = Config.load()
     except BaseException as err:
         Log.error(f"Error while loading configuration file:\n{str(err)}")
@@ -103,18 +152,22 @@ def main():
     if not config:
         Log.warn(f"Configuration file '{Config.FILENAME}' does not exist.")
         if Config.create():
-            Log.info(f"Default config: '{Config.FILENAME}' created.")
+            Log.notify(f"Default config: '{Config.FILENAME}' created.")
         return
+
+    # Save the configuration in case an update added additional options.
+    config.save()
 
     # Set the debug information.
     Log.debug_mode = config.debug
+    Log.verbose_mode = config.verbose
 
     # Ask the user for permission.
     if not config.skip_prompt:
         if not confirm_location(config.local_root):
             sys.exit(0)
         print("")
-    Log.info("Checking for updates.")
+    Log.notify("Checking for updates.")
 
     uri = f"{config.remote_root}:{config.remote_port}"
 
@@ -134,34 +187,40 @@ def main():
 
         # Check if the local is newer or the same.
         if version >= manifest.version:
-            Log.info("Already have the most up-to-date Manifest.")
+            Log.notify("Already have the most up-to-date Manifest.")
 
-    Log.info(f"Manifest Version: '{manifest.version}'\n")
+    Log.notify(f"Manifest Version: '{manifest.version}'\n")
 
     # Build the hashes.
     hashes = Hashes(uri, config.local_root)
-    Log.info(f"Updating '{hashes.name}' file.")
+    Log.notify(f"Updating '{hashes.name}' file.")
     hashes.update()
-    Log.info("Generating local hashes.\n")
+    Log.notify("Generating local hashes.\n")
     hashes.build_localhash()
 
     # Start checking for updates.
-    Log.info("Getting updates.")
+    Log.notify("Getting updates.")
     timestamp: datetime = datetime.now()
-    size = pull_updates(manifest, hashes)
+    size = pull_updates(manifest, hashes, config.verbose)
     timelength = datetime.now() - timestamp
 
     # Print some statistics.
     size_mb = size / 1024 / 1024
     time_sec = timelength.total_seconds()
     print("\n")
-    Log.info(f"Download rate: {(size_mb / time_sec):0.2f} mbps")
-    Log.info(f"Total time: {(time_sec/60):0.2f} min")
-    Log.info(f"Total size: {(size_mb / 1024):0.2f} gb ({size_mb:0.2f} mb)")
+    Log.notify("All files are up-to-date.")
+    Log.notify(f"Download rate: {(size_mb / time_sec):0.2f} mbps")
+    Log.notify(f"Total time: {(time_sec/60):0.2f} min")
+    Log.notify(f"Total size: {(size_mb / 1024):0.2f} gb ({size_mb:0.2f} mb)")
 
 
 if __name__ == "__main__":
     try:
+        if needs_update():
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            Log.warn("Update for the patcher is available at:\n"
+                     "\thttps://github.com/Ohkthx/uopatcher")
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n")
         main()
     except KeyboardInterrupt:
         Log.warn("Interrupt detected, exiting.")

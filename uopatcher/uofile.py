@@ -10,9 +10,26 @@ from datetime import datetime
 from log import Log
 
 
+def progress_bar(resource: str, size: int, max_size: int,
+                 start_time: datetime) -> None:
+    """Shows a download progress bar for the resource."""
+    percentage: float = size / max_size * 100
+    size_mb = size / 1024 / 1024
+
+    # Calculate the mb per second.
+    elapsed = datetime.now() - start_time
+    mbps = size_mb / elapsed.total_seconds()
+
+    Log.info(f"Downloading: '{resource}' "
+             f"[{percentage:0.2f}%] "
+             f"{mbps:0.2f} mbps", end='\r')
+
+
 def download_file(remote_resource: str,
                   local_resource: str,
-                  chunk_size: int = 1024) -> tuple[int, float]:
+                  chunk_size: int = 1024,
+                  show_progress: bool = False,
+                  ) -> tuple[int, float]:
     """Downloads a file from a remote host into a local repository.
     Returns a tuple containing (size [bytes], time [seconds])
     """
@@ -20,6 +37,9 @@ def download_file(remote_resource: str,
 
     # Get the stream we will be pulling from.
     request = urllib.request.urlopen(remote_resource)
+
+    as_path = pathlib.Path(remote_resource)
+    name = as_path.name
 
     # Calculate size of the downloaded content.
     size: int = 0
@@ -35,6 +55,7 @@ def download_file(remote_resource: str,
 
     # Open the local file, download the remote, saving locally.
     has_data: bool = True
+    pulled_size: int = 0
     with open(local_resource, 'wb') as f:
         while has_data:
             chunk = request.read(chunk_size)
@@ -42,9 +63,11 @@ def download_file(remote_resource: str,
                 has_data = False
                 continue
 
-            # Remove the BOM character at the start of the file.
-            if chunk.startswith(codecs.BOM_UTF8):
-                chunk = chunk[len(codecs.BOM_UTF8):]
+            # If VERBOSE is enabled in config, print the progress bar.
+            if show_progress:
+                pulled_size += len(chunk)
+                progress_bar(name, pulled_size, size, start)
+
             f.write(chunk)
 
     elapsed = datetime.now() - start
@@ -59,6 +82,10 @@ class FileAction(Enum):
 
 
 class UOFile:
+    """Represents a file for Ultima Online that may need to be
+    updated, removed, or untouched.
+    """
+
     REMOTE_ROOT: str = ""
     LOCAL_ROOT: str = ""
 
@@ -121,13 +148,17 @@ class UOFile:
                 hash_md5.update(chunk)
         return hash_md5.hexdigest().lower()
 
-    def download(self) -> Optional[tuple[int, float]]:
+    def download(self,
+                 show_progress: bool = False,
+                 ) -> Optional[tuple[int, float]]:
         """Downloads a file from the remote source.
         If successful, returns a tuple of the:
             size [bytes], time[seconds]
         """
         try:
-            return download_file(self.remote_resource, self.local_resource)
+            return download_file(self.remote_resource,
+                                 self.local_resource,
+                                 show_progress=show_progress)
         except KeyboardInterrupt:
             Log.warn("Interrupt detected, exiting.")
             sys.exit(1)

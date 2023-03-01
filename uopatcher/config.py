@@ -23,6 +23,11 @@ class Config:
         return self.config.getboolean('DEFAULT', 'SKIP_PROMPT', fallback=False)
 
     @property
+    def verbose(self) -> bool:
+        """Produce additional output to the user."""
+        return self.config.getboolean('DEFAULT', 'VERBOSE', fallback=False)
+
+    @property
     def local_root(self) -> str:
         """Local root directory for files to be saved to."""
         return self.config.get('DEFAULT', 'LOCAL_ROOT', fallback="temp")
@@ -54,6 +59,13 @@ class Config:
         config.read(Config.FILENAME)
         return Config(config)
 
+    def save(self):
+        """Saves the configuration file, only really used for future
+        updates where additional options exist.
+        """
+        with open(Config.FILENAME, 'w', encoding='utf-8') as f:
+            self.config.write(f)
+
     @staticmethod
     def create() -> bool:
         """Creates a new configuration file if it does not exist."""
@@ -66,6 +78,7 @@ class Config:
         config['DEFAULT'] = {}
         config['DEFAULT']['DEBUG'] = "False"
         config['DEFAULT']['SKIP_PROMPT'] = "False"
+        config['DEFAULT']['VERBOSE'] = "False"
         config['DEFAULT']['LOCAL_ROOT'] = "temp"
         config['DEFAULT']['REMOTE_ROOT'] = "patch.example.com"
         config['DEFAULT']['REMOTE_PORT'] = "8080"
