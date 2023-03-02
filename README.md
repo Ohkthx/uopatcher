@@ -5,6 +5,9 @@
 This application is used to provide cross-platform support to shards/servers that utilize a **Manifest**-based patching technique. You will need to know the **root url**  and **port** required to access that data. 
 
 
+If you are interested in a **cross-platform (x) installer, patcher, and launcher (ipl)**... then check out my other current work-in-progress project @[Ohkthx/xipl](https://github.com/Ohkthx/xipl) that utilizes this.
+
+
 ### Requirements
 
 Current requirements are at least **Python Version 3.9.1**, however with slight tweaking by removing the typing/type safety can make it on earlier Python3 versions. All external package requirements have been removed to allow for easier installation. You can check your python version with the following commands:
