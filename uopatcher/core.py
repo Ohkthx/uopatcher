@@ -13,6 +13,8 @@ from hashes import Hashes
 from config import Config
 from manifest import Manifest
 
+UOPATCHER_VERSION: tuple[int, int, int] = (1, 0, 3)
+
 # Make sure the python version satisfies the requirement.
 if sys.version_info < (3, 9, 1):
     Log.error("Python needs to be at least version 3.9.1")
@@ -26,23 +28,6 @@ def print_version(version: tuple[int, int, int]):
 
 def needs_update() -> bool:
     """Checks to see if a newer patcher version exists on GitHub."""
-    # Check that the local README.md exists
-    local_readme: str = "./README.md"
-    if not pathlib.Path(local_readme).is_file():
-        raise FileNotFoundError("Cannot check for patcher updates, "
-                                "required README.md could not be found.")
-
-    # Parse the version from the local README.md
-    local_version: tuple[int, int, int] = (0, 0, 0)
-    with open(local_readme, 'r', encoding='utf-8') as f:
-        encoded_version = f.readline().strip()
-        try:
-            decoded_version = json.loads(encoded_version)
-            local_version = tuple(decoded_version['version'])
-        except BaseException:
-            raise ValueError("Could not parse patcher's "
-                             "version from README.md.")
-
     # Attempt to get the version that GitHub is currently on.
     remote_version: tuple[int, int, int] = (0, 0, 0)
     remote_readme: str = "https://raw.githubusercontent.com/Ohkthx/uopatcher/main/README.md"
@@ -57,9 +42,9 @@ def needs_update() -> bool:
                              "remote version from README.md.")
 
     # Check for version mismatch.
-    Log.notify(f"Local Patcher Version:  {print_version(local_version)}")
+    Log.notify(f"Local Patcher Version:  {print_version(UOPATCHER_VERSION)}")
     Log.notify(f"Remote Patcher Version: {print_version(remote_version)}\n")
-    return local_version < remote_version
+    return UOPATCHER_VERSION < remote_version
 
 
 def pull_updates(manifest: Manifest,
