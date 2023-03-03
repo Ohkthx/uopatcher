@@ -2,10 +2,10 @@
 
 # Ultima Online Manifest Patcher
 
-This application is used to provide cross-platform support to shards/servers that utilize a **Manifest**-based patching technique. You will need to know the **root url**  and **port** required to access that data. 
+This application is used to provide cross-platform support to shards/servers that utilize a **Manifest**-based patching technique. The original patching concept is accredited to [Voxpire](https://github.com/Voxpire) with his [ServUO/IPL](https://www.servuo.com/archive/all-in-one-installer-patcher-launcher-ipl.1724/) used for installing, patching, and launching custom Ultima Online shards clients. To get this project up and running, you will need to know the **root url** and **port** required to access that data. 
 
 
-If you are interested in a **cross-platform (x) installer, patcher, and launcher (ipl)**... then check out my other current work-in-progress project @[Ohkthx/xipl](https://github.com/Ohkthx/xipl) that utilizes this.
+If you are interested in an open-sourced **cross-platform (x) installer, patcher, and launcher (IPL)**... then check out my other project @[Ohkthx/xIPL](https://github.com/Ohkthx/xIPL) that utilizes this and implements similar functionality as Voxpire's IPL mentioned above. The **xIPL** extends this patcher further with the other elements an **IPL** must contain beyond just patching.
 
 
 ### Requirements
