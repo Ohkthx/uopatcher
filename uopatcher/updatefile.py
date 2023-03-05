@@ -17,6 +17,12 @@ class UpdateFile(UOFile):
     @staticmethod
     def add_uofile(uofile: UOFile) -> None:
         """Adds a UOFile to be tracked."""
+        original = UpdateFile.FILES.get(str(uofile.path), None)
+
+        # Assign the higher priority action.
+        if original and original.action > uofile.action:
+            uofile.action = original.action
+
         UpdateFile.FILES[str(uofile.path)] = uofile
 
     @staticmethod

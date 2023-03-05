@@ -1,4 +1,4 @@
-{ "version": [1, 0, 4] }
+{ "version": [1, 0, 5] }
 
 # Ultima Online Manifest Patcher
 
@@ -25,7 +25,7 @@ Configuration file is located in the root directory, named **config.ini**, and g
 debug = False
 skip_prompt = False
 verbose = False
-local_root = temp
+local_root = uoinstall
 remote_root = patch.example.com
 remote_port = 8080
 ```

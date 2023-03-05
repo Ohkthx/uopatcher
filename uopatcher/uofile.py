@@ -1,8 +1,9 @@
+import os
 import sys
 import pathlib
 import hashlib
 import urllib.request
-from enum import Enum
+from enum import IntEnum, auto
 from typing import Optional
 from datetime import datetime
 
@@ -12,6 +13,9 @@ from log import Log
 def progress_bar(resource: str, size: int, max_size: int,
                  start_time: datetime) -> None:
     """Shows a download progress bar for the resource."""
+    if max_size <= 0:
+        return
+
     percentage: float = size / max_size * 100
     size_mb = size / 1024 / 1024
 
@@ -28,7 +32,7 @@ def download_file(remote_resource: str,
                   local_resource: str,
                   chunk_size: int = 1024 * 1024,
                   show_progress: bool = False,
-                  ) -> tuple[int, float]:
+                  ) -> tuple[int, float, bool]:
     """Downloads a file from a remote host into a local repository.
     Returns a tuple containing (size [bytes], time [seconds])
     """
@@ -41,13 +45,13 @@ def download_file(remote_resource: str,
     name = as_path.name
 
     # Calculate size of the downloaded content.
-    size: int = 0
+    max_size: int = 0
     content_length = request.getheader("content-length", None)
     if content_length:
         try:
-            size = int(content_length)
+            max_size = int(content_length)
         except BaseException:
-            size = 0
+            max_size = 0
 
     # Ensure the local directories exist.
     pathlib.Path(local_resource).parent.mkdir(parents=True, exist_ok=True)
@@ -64,20 +68,20 @@ def download_file(remote_resource: str,
 
             # If VERBOSE is enabled in config, print the progress bar.
             if show_progress:
-                pulled_size += len(chunk)
-                progress_bar(name, pulled_size, size, start)
+                progress_bar(name, pulled_size, max_size, start)
 
+            pulled_size += len(chunk)
             f.write(chunk)
 
     elapsed = datetime.now() - start
-    return size, elapsed.total_seconds()
+    return pulled_size, elapsed.total_seconds(), pulled_size == max_size
 
 
-class FileAction(Enum):
+class FileAction(IntEnum):
     """Actions to perform on the files."""
-    NONE = "none"
-    CREATE = "create"
-    DELETE = "delete"
+    NONE = auto()
+    CREATE = auto()
+    DELETE = auto()
 
 
 class UOFile:
@@ -121,6 +125,13 @@ class UOFile:
         return pathlib.Path(self.parent, self.name)
 
     @property
+    def local_size(self) -> int:
+        """Gets the size of the file in bytes."""
+        if self.local_exists:
+            return os.stat(self.local_resource).st_size
+        return -1
+
+    @property
     def remote_resource(self) -> str:
         """The remote resource where the file can be obtained."""
         return f"{UOFile.REMOTE_ROOT}/{self.path}"
@@ -149,7 +160,7 @@ class UOFile:
 
     def download(self,
                  show_progress: bool = False,
-                 ) -> Optional[tuple[int, float]]:
+                 ) -> Optional[tuple[int, float, bool]]:
         """Downloads a file from the remote source.
         If successful, returns a tuple of the:
             size [bytes], time[seconds]

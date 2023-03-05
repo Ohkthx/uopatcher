@@ -134,6 +134,7 @@ dmypy.json
 .idea/
 
 # Temporary Directories and Files
+uoinstall/
 temp/
 tmp/
 this.commit_msg

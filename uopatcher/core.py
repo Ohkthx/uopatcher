@@ -9,14 +9,14 @@ import urllib.request
 from datetime import datetime
 
 from log import Log
-from uofile import FileAction
 from hashes import Hashes
 from config import Config
 from manifest import Manifest
+from uofile import UOFile, FileAction
 
 
 class OPTS:
-    LVERSION: tuple[int, int, int] = (1, 0, 4)
+    LVERSION: tuple[int, int, int] = (1, 0, 5)
     RVERSION: tuple[int, int, int] = (0, 0, 0)
     ONLY_UPDATE: bool = False
     ONLY_VERSION: bool = False
@@ -67,55 +67,89 @@ def needs_update() -> bool:
     return OPTS.LVERSION < OPTS.RVERSION
 
 
+def remove_file(hashes: Hashes, uofile: UOFile, clean: bool):
+    """Removes / Deletes a file and cleans up the Hashes file."""
+    if not uofile.local_exists:
+        return
+
+    try:
+        os.remove(uofile.local_resource)
+        Log.info(f"Removed: '{uofile.name}'", end='\r')
+    except FileNotFoundError:
+        Log.error(f"File cannot be deleted: '{uofile.id}'")
+
+    if clean:
+        del hashes.local_hashes[uofile.id]
+        del hashes.sizes[uofile.id]
+
+
+def process_uofile(hashes: Hashes, uofile: UOFile,
+                   remote_size: int, verbose: bool) -> int:
+    """Processes the creation or removal of a UO File."""
+    # Check if the local version exists.
+    action: FileAction = FileAction.NONE
+    local_hash = hashes.local_hashes.get(uofile.id, None)
+
+    if not local_hash and uofile.action != FileAction.DELETE:
+        # File needs to be downloaded since it does not exist.
+        action = FileAction.CREATE
+    elif (uofile.local_size >= 0 and remote_size >= 0
+          and uofile.action == FileAction.NONE
+          and uofile.local_size != remote_size):
+        # File may not have been downloaded correctly.
+        action = FileAction.CREATE
+    elif local_hash and uofile.action == FileAction.DELETE:
+        # Mark the file for deletion.
+        action = FileAction.DELETE
+    elif local_hash and uofile.action == FileAction.CREATE:
+        # File exists, should not be updated every patch.
+        action = FileAction.NONE
+    elif local_hash and uofile.remote_hashes:
+        if local_hash not in uofile.remote_hashes:
+            # Hash mismatch, needs the new version.
+            action = FileAction.CREATE
+
+    # Perform the non-create actions.
+    if action == FileAction.NONE:
+        Log.info(f"Skipped: '{uofile.name}'", end='\r')
+        return 0
+    elif action == FileAction.DELETE:
+        Log.info(f"Removing: '{uofile.name}'", end='\r')
+        remove_file(hashes, uofile, True)
+        return 0
+
+    Log.notify(f"Downloading: '{uofile.name}'", end='\r')
+    stats = uofile.download(show_progress=verbose)
+    if not stats:
+        Log.error(f"Failed: '{uofile.name}'")
+        return 0
+
+    # Add to the download size.
+    mbps = (stats[0] / 1024 / 1024) / stats[1]
+    Log.info(f"Downloaded: '{uofile.name}', "
+             f"{mbps:0.2f} mbps")
+    return stats[0]
+
+
 def pull_updates(manifest: Manifest,
                  hashes: Hashes,
                  verbose: bool) -> int:
     """Pulls updates from the remote server."""
     total_size: int = 0
-    for file_id, uofile in manifest.FILES.items():
+    for _, uofile in manifest.FILES.items():
         Log.notify(f"Checking: '{uofile.name}'", end='\r')
+        remote_size = hashes.sizes.get(uofile.id, 0)
 
-        # Check if the local version exists.
-        action: FileAction = FileAction.NONE
-        local_hash = hashes.local_hashes.get(file_id, None)
-        if not local_hash and uofile.action != FileAction.DELETE:
-            # Files needs to be downloaded.
-            action = FileAction.CREATE
+        size = process_uofile(hashes, uofile, remote_size, verbose)
+        if size > 0 and remote_size > 0 and size < remote_size:
+            Log.warn(f"Failed: '{uofile.name}, trying again.'")
+            # Full expected file not installed. Try again.
+            remove_file(hashes, uofile, False)
+            size = process_uofile(hashes, uofile, remote_size, verbose)
 
-        if not uofile.remote_hashes:
-            # File does not exist in the remote, delete it locally.
-            action = FileAction.DELETE
-        elif local_hash and local_hash not in uofile.remote_hashes:
-            # Mismatched hashes, get the remote version.
-            action = FileAction.CREATE
+        # Add the size.
+        total_size = total_size + size
 
-        # Perform the non-create actions.
-        if action == FileAction.NONE:
-            Log.info(f"Skipped: '{uofile.name}'", end='\r')
-            continue
-        elif action == FileAction.DELETE:
-            Log.info(f"Removing: '{uofile.name}'", end='\r')
-            if uofile.local_exists:
-                try:
-                    os.remove(uofile.local_resource)
-                    Log.info(f"Removed: '{uofile.name}'", end='\r')
-                except FileNotFoundError:
-                    Log.error(f"File cannot be deleted: '{file_id}'")
-                del hashes.local_hashes[file_id]
-                del hashes.sizes[file_id]
-                continue
-
-        Log.notify(f"Downloading: '{uofile.name}'", end='\r')
-        stats = uofile.download(show_progress=verbose)
-        if not stats:
-            Log.error(f"Failed: '{uofile.name}'")
-        else:
-            # Add to the download size.
-            mbps = (stats[0] / 1024 / 1024) / stats[1]
-            Log.info(f"Downloaded: '{uofile.name}', {mbps:0.2f} mbps")
-            size = hashes.sizes.get(file_id, None)
-            if size and size > 0:
-                total_size = total_size + size
     Log.clear()
     return total_size
 
@@ -231,14 +265,13 @@ if __name__ == "__main__":
     # Process the arguments passed.
     if OPTS.ONLY_UPDATE:
         # Intentionally not casting to int here.
+        print(print_version(OPTS.RVERSION))
         sys.exit(1 if update_exists else 0)
     elif OPTS.ONLY_VERSION:
         print(print_version(OPTS.LVERSION))
         sys.exit(0)
 
     try:
-        Log.notify(f"Local Patcher Version:  {print_version(OPTS.LVERSION)}")
-        Log.notify(f"Remote Patcher Version: {print_version(OPTS.RVERSION)}\n")
         if update_exists:
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             Log.warn("Update for the patcher is available at:\n"
