@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import pathlib
+import argparse
 import urllib.request
 from datetime import datetime
 
@@ -13,12 +14,34 @@ from hashes import Hashes
 from config import Config
 from manifest import Manifest
 
-UOPATCHER_VERSION: tuple[int, int, int] = (1, 0, 3)
+
+class OPTS:
+    LVERSION: tuple[int, int, int] = (1, 0, 4)
+    RVERSION: tuple[int, int, int] = (0, 0, 0)
+    ONLY_UPDATE: bool = False
+    ONLY_VERSION: bool = False
+
 
 # Make sure the python version satisfies the requirement.
 if sys.version_info < (3, 9, 1):
     Log.error("Python needs to be at least version 3.9.1")
     sys.exit(1)
+
+
+def parse_args() -> None:
+    """Parse the arguments passed to the patcher."""
+    parser = argparse.ArgumentParser(description="Install and Patch UO.")
+    parser.add_argument("--has-update",
+                        action="store_true",
+                        dest="only_update",
+                        help="Checks if an update is available or not.")
+    parser.add_argument("--version",
+                        action="store_true",
+                        dest="only_version",
+                        help="Returns the version of the script.")
+    args = parser.parse_args()
+    OPTS.ONLY_UPDATE = args.only_update
+    OPTS.ONLY_VERSION = args.only_version
 
 
 def print_version(version: tuple[int, int, int]):
@@ -29,22 +52,19 @@ def print_version(version: tuple[int, int, int]):
 def needs_update() -> bool:
     """Checks to see if a newer patcher version exists on GitHub."""
     # Attempt to get the version that GitHub is currently on.
-    remote_version: tuple[int, int, int] = (0, 0, 0)
     remote_readme: str = "https://raw.githubusercontent.com/Ohkthx/uopatcher/main/README.md"
     with urllib.request.urlopen(remote_readme) as remote:
         try:
             # Read the first line and decode the version.
             encoded_version = remote.readline().decode().strip()
             decoded_version = json.loads(encoded_version)
-            remote_version = tuple(decoded_version['version'])
+            OPTS.RVERSION = tuple(decoded_version['version'])
         except BaseException:
             raise ValueError("Could not parse patcher's "
                              "remote version from README.md.")
 
     # Check for version mismatch.
-    Log.notify(f"Local Patcher Version:  {print_version(UOPATCHER_VERSION)}")
-    Log.notify(f"Remote Patcher Version: {print_version(remote_version)}\n")
-    return UOPATCHER_VERSION < remote_version
+    return OPTS.LVERSION < OPTS.RVERSION
 
 
 def pull_updates(manifest: Manifest,
@@ -200,13 +220,33 @@ def main():
 
 
 if __name__ == "__main__":
+    parse_args()
+    update_exists: bool = False
     try:
-        if needs_update():
+        update_exists = needs_update()
+    except BaseException as exc:
+        Log.error(f"Critical Error: [{type(exc)}] {exc}")
+        exit(1)
+
+    # Process the arguments passed.
+    if OPTS.ONLY_UPDATE:
+        # Intentionally not casting to int here.
+        sys.exit(1 if update_exists else 0)
+    elif OPTS.ONLY_VERSION:
+        print(print_version(OPTS.LVERSION))
+        sys.exit(0)
+
+    try:
+        Log.notify(f"Local Patcher Version:  {print_version(OPTS.LVERSION)}")
+        Log.notify(f"Remote Patcher Version: {print_version(OPTS.RVERSION)}\n")
+        if update_exists:
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             Log.warn("Update for the patcher is available at:\n"
                      "\thttps://github.com/Ohkthx/uopatcher")
             print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n")
         main()
+    except SystemExit:
+        pass
     except KeyboardInterrupt:
         Log.warn("Interrupt detected, exiting.")
         sys.exit(1)
