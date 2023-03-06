@@ -1,3 +1,4 @@
+from os import path
 import pathlib
 import configparser
 from typing import Optional
@@ -7,8 +8,10 @@ class Config:
     """User defined settings that are saved locally."""
     FILENAME: str = "config.ini"
 
-    def __init__(self, config: configparser.ConfigParser) -> None:
+    def __init__(self, config: configparser.ConfigParser,
+                 file_path: pathlib.Path) -> None:
         self.config = config
+        self.file_path = file_path
 
     @property
     def debug(self) -> bool:
@@ -43,21 +46,21 @@ class Config:
         return self.config.getint('DEFAULT', 'REMOTE_PORT', fallback=8080)
 
     @staticmethod
-    def exists() -> bool:
+    def exists(file_path: pathlib.Path) -> bool:
         """Checks if the configuration file already exists."""
-        return pathlib.Path(Config.FILENAME).is_file()
+        return file_path.is_file()
 
     @staticmethod
-    def load() -> Optional['Config']:
+    def load(file_path: pathlib.Path) -> Optional['Config']:
         """Loads the configuration file from a local file."""
         # Cannot load a non-existing file.
-        if not Config.exists():
+        if not Config.exists(file_path):
             return None
 
         # Load the file, initialize Config.
         config = configparser.ConfigParser()
-        config.read(Config.FILENAME)
-        return Config(config)
+        config.read(file_path)
+        return Config(config, file_path)
 
     def save(self):
         """Saves the configuration file, only really used for future
@@ -72,14 +75,14 @@ class Config:
         config['DEFAULT']['REMOTE_ROOT'] = str(self.remote_root)
         config['DEFAULT']['REMOTE_PORT'] = str(self.remote_port)
 
-        with open(Config.FILENAME, 'w', encoding='utf-8') as f:
+        with open(self.file_path, 'w', encoding='utf-8') as f:
             config.write(f)
 
     @staticmethod
-    def create() -> bool:
+    def create(file_path: pathlib.Path) -> bool:
         """Creates a new configuration file if it does not exist."""
         # If the file exists, ignore.
-        if Config.exists():
+        if Config.exists(file_path):
             return False
 
         # Create the default values that must be changed.
@@ -93,6 +96,6 @@ class Config:
         config['DEFAULT']['REMOTE_PORT'] = "8080"
 
         # Save it locally.
-        with open(Config.FILENAME, 'w', encoding='utf-8') as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             config.write(f)
         return True

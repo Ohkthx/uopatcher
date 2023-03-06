@@ -16,10 +16,11 @@ from uofile import UOFile, FileAction
 
 
 class OPTS:
-    LVERSION: tuple[int, int, int] = (1, 0, 5)
+    LVERSION: tuple[int, int, int] = (1, 0, 6)
     RVERSION: tuple[int, int, int] = (0, 0, 0)
     ONLY_UPDATE: bool = False
     ONLY_VERSION: bool = False
+    CONFIG_FILE: pathlib.Path = pathlib.Path(Config.FILENAME)
 
 
 # Make sure the python version satisfies the requirement.
@@ -35,13 +36,22 @@ def parse_args() -> None:
                         action="store_true",
                         dest="only_update",
                         help="Checks if an update is available or not.")
+    parser.add_argument("--config",
+                        dest="config",
+                        help="Pass the 'config.ini' to use.")
     parser.add_argument("--version",
                         action="store_true",
                         dest="only_version",
                         help="Returns the version of the script.")
+
+    # Parse the arguments passed to the application.
     args = parser.parse_args()
     OPTS.ONLY_UPDATE = args.only_update
     OPTS.ONLY_VERSION = args.only_version
+
+    # Modify the configuration file location if it was passed.
+    if args.config:
+        OPTS.CONFIG_FILE = pathlib.Path(args.config)
 
 
 def print_version(version: tuple[int, int, int]):
@@ -183,14 +193,14 @@ def main():
     # Try to load the configuration, if it fails it will be created.
     try:
         Log.notify(f"Loading configuration file: '{Config.FILENAME}'\n")
-        config = Config.load()
+        config = Config.load(OPTS.CONFIG_FILE)
     except BaseException as err:
         Log.error(f"Error while loading configuration file:\n{str(err)}")
         return
 
     if not config:
         Log.warn(f"Configuration file '{Config.FILENAME}' does not exist.")
-        if Config.create():
+        if Config.create(OPTS.CONFIG_FILE):
             Log.notify(f"Default config: '{Config.FILENAME}' created.")
         return
 
