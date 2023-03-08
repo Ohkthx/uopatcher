@@ -16,7 +16,7 @@ from uofile import UOFile, FileAction
 
 
 class OPTS:
-    LVERSION: tuple[int, int, int] = (1, 0, 7)
+    LVERSION: tuple[int, int, int] = (1, 0, 8)
     RVERSION: tuple[int, int, int] = (0, 0, 0)
     ONLY_UPDATE: bool = False
     ONLY_VERSION: bool = False
@@ -273,7 +273,8 @@ if __name__ == "__main__":
     parse_args()
     update_exists: bool = False
     try:
-        Log.notify("Checking for patcher updates.")
+        if not OPTS.ONLY_VERSION and not OPTS.ONLY_UPDATE:
+            Log.notify("Checking for patcher updates.")
         update_exists = needs_update()
     except BaseException:
         Log.error("Could not check for updates. "

@@ -1,4 +1,4 @@
-{ "version": [1, 0, 7] }
+{ "version": [1, 0, 8] }
 
 <p align="center">
     <a href="https://discord.gg/HP3fGNtzfs" title="Connect to the community!">
