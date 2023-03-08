@@ -16,10 +16,11 @@ from uofile import UOFile, FileAction
 
 
 class OPTS:
-    LVERSION: tuple[int, int, int] = (1, 0, 6)
+    LVERSION: tuple[int, int, int] = (1, 0, 7)
     RVERSION: tuple[int, int, int] = (0, 0, 0)
     ONLY_UPDATE: bool = False
     ONLY_VERSION: bool = False
+    VERBOSE: bool = False
     CONFIG_FILE: pathlib.Path = pathlib.Path(Config.FILENAME)
 
 
@@ -43,11 +44,16 @@ def parse_args() -> None:
                         action="store_true",
                         dest="only_version",
                         help="Returns the version of the script.")
+    parser.add_argument("--verbose",
+                        action="store_true",
+                        dest="verbose",
+                        help="Overrides VERBOSE in config.ini.")
 
     # Parse the arguments passed to the application.
     args = parser.parse_args()
     OPTS.ONLY_UPDATE = args.only_update
     OPTS.ONLY_VERSION = args.only_version
+    OPTS.VERBOSE = args.verbose
 
     # Modify the configuration file location if it was passed.
     if args.config:
@@ -128,16 +134,17 @@ def process_uofile(hashes: Hashes, uofile: UOFile,
         remove_file(hashes, uofile, True)
         return 0
 
-    Log.notify(f"Downloading: '{uofile.name}'", end='\r')
+    if not verbose:
+        Log.notify(f"Downloading: '{uofile.name}'", end='\r')
+
     stats = uofile.download(show_progress=verbose)
     if not stats:
         Log.error(f"Failed: '{uofile.name}'")
         return 0
 
-    # Add to the download size.
-    mbps = (stats[0] / 1024 / 1024) / stats[1]
-    Log.info(f"Downloaded: '{uofile.name}', "
-             f"{mbps:0.2f} mbps")
+    if not verbose:
+        Log.notify(f"Downloaded: '{uofile.name}'")
+
     return stats[0]
 
 
@@ -147,7 +154,6 @@ def pull_updates(manifest: Manifest,
     """Pulls updates from the remote server."""
     total_size: int = 0
     for _, uofile in manifest.FILES.items():
-        Log.notify(f"Checking: '{uofile.name}'", end='\r')
         remote_size = hashes.sizes.get(uofile.id, 0)
 
         size = process_uofile(hashes, uofile, remote_size, verbose)
@@ -209,14 +215,14 @@ def main():
 
     # Set the debug information.
     Log.debug_mode = config.debug
-    Log.verbose_mode = config.verbose
+    Log.verbose_mode = config.verbose or OPTS.VERBOSE
 
     # Ask the user for permission.
     if not config.skip_prompt:
         if not confirm_location(config.local_root):
             sys.exit(0)
         print("")
-    Log.notify("Checking for updates.")
+    Log.notify("Checking for file updates.")
 
     uri = f"{config.remote_root}:{config.remote_port}"
 
@@ -250,7 +256,7 @@ def main():
     # Start checking for updates.
     Log.notify("Getting updates.")
     timestamp: datetime = datetime.now()
-    size = pull_updates(manifest, hashes, config.verbose)
+    size = pull_updates(manifest, hashes, Log.verbose_mode)
     timelength = datetime.now() - timestamp
 
     # Print some statistics.
@@ -267,9 +273,11 @@ if __name__ == "__main__":
     parse_args()
     update_exists: bool = False
     try:
+        Log.notify("Checking for patcher updates.")
         update_exists = needs_update()
-    except BaseException as exc:
-        Log.error(f"Critical Error: [{type(exc)}] {exc}")
+    except BaseException:
+        Log.error("Could not check for updates. "
+                  "There may be a connection issue.")
         exit(1)
 
     # Process the arguments passed.

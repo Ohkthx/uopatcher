@@ -1,9 +1,16 @@
-{ "version": [1, 0, 6] }
+{ "version": [1, 0, 7] }
+
+<p align="center">
+    <a href="https://discord.gg/HP3fGNtzfs" title="Connect to the community!">
+        <img src="https://img.shields.io/badge/discord-accept%20invite-7289da.svg?style=for-the-badge&logo=discord"
+            alt="Discord connect button."></a>
+</p>
 
 # Ultima Online Manifest Patcher
 
 This application is used to provide cross-platform support to shards/servers that utilize a **Manifest**-based patching technique. The original patching concept is accredited to [Voxpire](https://github.com/Voxpire) with his [ServUO/IPL](https://www.servuo.com/archive/all-in-one-installer-patcher-launcher-ipl.1724/) used for installing, patching, and launching custom Ultima Online shards clients. To get this project up and running, you will need to know the **root url** and **port** required to access that data. 
 
+<ins>Feel free to join the **Ultima Online: Linux and MacOS** community by clicking **ACCEPT INVITE** button above.</ins>
 
 If you are interested in an open-sourced **cross-platform (x) installer, patcher, and launcher (IPL)**... then check out my other project @[Ohkthx/xIPL](https://github.com/Ohkthx/xIPL) that utilizes this and implements similar functionality as Voxpire's IPL mentioned above. The **xIPL** extends this patcher further with the other elements an **IPL** must contain beyond just patching.
 
