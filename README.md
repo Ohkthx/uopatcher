@@ -1,4 +1,4 @@
-{ "version": [1, 0, 8] }
+{ "version": [1, 0, 9] }
 
 <p align="center">
     <a href="https://discord.gg/HP3fGNtzfs" title="Connect to the community!">
@@ -31,8 +31,8 @@ Configuration file is located in the root directory, named **config.ini**, and g
 [DEFAULT]
 debug = False
 skip_prompt = False
-verbose = False
-local_root = uoinstall
+verbose = True
+local_root = client
 remote_root = patch.example.com
 remote_port = 8080
 ```
@@ -44,6 +44,22 @@ remote_port = 8080
 - **remote_root** - Root URL/URI to obtain the Manifest, Hashes, and additional patch files.
 - **remote_port** - Port used to access the resources. 
 
+## Arguments / Flags
+
+These are optional arguments that can be passed to `core.py` at start to modify the application at run-time. These **OVERRIDE** the configuration file in the even two options are the same.
+```
+usage: core.py [-h] [--has-update] [--config CONFIG] [--version] [--verbose]
+
+Install and Patch UO.
+
+optional arguments:
+  -h, --help       show this help message and exit
+  --has-update     Checks if an update is available or not.
+  --config CONFIG  Pass the 'config.ini' to use.
+  --version        Returns the version of the script.
+  --verbose        Overrides VERBOSE in config.ini.
+```
+
 ## Running
 
 Use the command below to start the patcher, remember that upon first time execution, it will generate the **config.ini** file that must be updated with the correct remote resources to pull patches.
@@ -53,3 +69,4 @@ python3 uopatcher/core.py
 # OR, this is optional way to start it.
 make start
 ```
+

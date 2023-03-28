@@ -28,12 +28,12 @@ class Config:
     @property
     def verbose(self) -> bool:
         """Produce additional output to the user."""
-        return self.config.getboolean('DEFAULT', 'VERBOSE', fallback=False)
+        return self.config.getboolean('DEFAULT', 'VERBOSE', fallback=True)
 
     @property
     def local_root(self) -> str:
         """Local root directory for files to be saved to."""
-        return self.config.get('DEFAULT', 'LOCAL_ROOT', fallback="temp")
+        return self.config.get('DEFAULT', 'LOCAL_ROOT', fallback="client")
 
     @property
     def remote_root(self) -> str:
@@ -90,8 +90,8 @@ class Config:
         config['DEFAULT'] = {}
         config['DEFAULT']['DEBUG'] = "False"
         config['DEFAULT']['SKIP_PROMPT'] = "False"
-        config['DEFAULT']['VERBOSE'] = "False"
-        config['DEFAULT']['LOCAL_ROOT'] = "temp"
+        config['DEFAULT']['VERBOSE'] = "True"
+        config['DEFAULT']['LOCAL_ROOT'] = "client"
         config['DEFAULT']['REMOTE_ROOT'] = "patch.example.com"
         config['DEFAULT']['REMOTE_PORT'] = "8080"
 
