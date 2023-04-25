@@ -12,7 +12,7 @@
         <img src="https://img.shields.io/badge/python-3.9.1+-11111b.svg?style=for-the-badge&color=f9e2af&label=PYTHON&logo=python&logoColor=f9e2af&labelColor=11111b"
             alt="Required Python Version."></a>
     <a href="https://github.com/ohkthx/uopatcher" title="Size of the repo!">
-        <img src="https://img.shields.io/github/repo-size/ohkthx/xIPL?style=for-the-badge&color=cba6f7&label=SIZE&logo=codesandbox&logoColor=cba6f7&labelColor=11111b"
+        <img src="https://img.shields.io/github/repo-size/ohkthx/uopatcher?style=for-the-badge&color=cba6f7&label=SIZE&logo=codesandbox&logoColor=cba6f7&labelColor=11111b"
             alt="No data."></a>
 <br>
    <a href="https://discord.gg/HP3fGNtzfs" title="Connect to the community!">
