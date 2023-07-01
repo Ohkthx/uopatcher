@@ -1,4 +1,4 @@
-{ "version": [1, 0, 10] }
+{ "version": [1, 0, 11] }
 
 <p align="center">
     <a href="https://patreon.com/ohkthx" title="Donate to this project using Patreon">

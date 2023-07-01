@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import os
+import ssl
 import sys
 import json
 import pathlib
+import platform
 import argparse
 import urllib.request
 from datetime import datetime
@@ -16,7 +18,7 @@ from uofile import UOFile, FileAction
 
 
 class OPTS:
-    LVERSION: tuple[int, int, int] = (1, 0, 10)
+    LVERSION: tuple[int, int, int] = (1, 0, 11)
     RVERSION: tuple[int, int, int] = (0, 0, 0)
     ONLY_UPDATE: bool = False
     ONLY_VERSION: bool = False
@@ -67,9 +69,17 @@ def print_version(version: tuple[int, int, int]):
 
 def needs_update() -> bool:
     """Checks to see if a newer patcher version exists on GitHub."""
+
+    context = None
+    if platform.system().lower() == 'darwin':
+        # Fixes issue with OSX certs.
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
     # Attempt to get the version that GitHub is currently on.
     url = "https://raw.githubusercontent.com/Ohkthx/uopatcher/main/README.md"
-    with urllib.request.urlopen(url) as remote:
+    with urllib.request.urlopen(url, context=context) as remote:
         try:
             # Read the first line and decode the version.
             encoded_version = remote.readline().decode().strip()
