@@ -16,7 +16,7 @@ from uofile import UOFile, FileAction
 
 
 class OPTS:
-    LVERSION: tuple[int, int, int] = (1, 0, 9)
+    LVERSION: tuple[int, int, int] = (1, 0, 10)
     RVERSION: tuple[int, int, int] = (0, 0, 0)
     ONLY_UPDATE: bool = False
     ONLY_VERSION: bool = False
@@ -68,16 +68,16 @@ def print_version(version: tuple[int, int, int]):
 def needs_update() -> bool:
     """Checks to see if a newer patcher version exists on GitHub."""
     # Attempt to get the version that GitHub is currently on.
-    remote_readme: str = "https://raw.githubusercontent.com/Ohkthx/uopatcher/main/README.md"
-    with urllib.request.urlopen(remote_readme) as remote:
+    url = "https://raw.githubusercontent.com/Ohkthx/uopatcher/main/README.md"
+    with urllib.request.urlopen(url) as remote:
         try:
             # Read the first line and decode the version.
             encoded_version = remote.readline().decode().strip()
             decoded_version = json.loads(encoded_version)
             OPTS.RVERSION = tuple(decoded_version['version'])
-        except BaseException:
+        except BaseException as exc:
             raise ValueError("Could not parse patcher's "
-                             "remote version from README.md.")
+                             f"remote version from README.md: {exc}")
 
     # Check for version mismatch.
     return OPTS.LVERSION < OPTS.RVERSION
@@ -276,10 +276,8 @@ if __name__ == "__main__":
         if not OPTS.ONLY_VERSION and not OPTS.ONLY_UPDATE:
             Log.notify("Checking for patcher updates.")
         update_exists = needs_update()
-    except BaseException:
-        Log.error("Could not check for updates. "
-                  "There may be a connection issue.")
-        exit(1)
+    except BaseException as exc:
+        Log.error(f"Could not check for updates. {exc}")
 
     # Process the arguments passed.
     if OPTS.ONLY_UPDATE:
